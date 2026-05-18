@@ -44,8 +44,7 @@ endif()
 target_sources(nv PRIVATE ${SRC_FILES})
 target_include_directories(nv PRIVATE "./include" "./")
 
-add_library(nvtree STATIC "nvtree/main.c")
-target_compile_definitions(nvtree PRIVATE NVTREE_CONFIG="nvtree_conf.h")
+add_library(nvtree STATIC "nvtree/nvtree.c" "nvtree/rb.c")
 target_include_directories(nvtree PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/nvtree)
 target_link_libraries(nv PRIVATE nvtree)
 
