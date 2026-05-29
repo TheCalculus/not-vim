@@ -148,4 +148,6 @@ int nv_render_term();
 int nv_push_buffer(struct nv_buff buffer);
 int nv_open_window(struct nv_window_node window);
 
+#define nv_log_unimplemented() (nv_log("UNIMPLEMENTED @ %s (ln %d)\n", __func__, __LINE__))
+
 #endif

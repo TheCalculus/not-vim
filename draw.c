@@ -51,7 +51,7 @@ void nv_draw_cursor()
     }
 
     int effective_row = 0;
-    struct nv_render_line* l;
+    cvector(nv_render_line) l;
 
     for (int cindex = 0; cindex < cvector_size(ctx.view->cursors); cindex++) {
         c = ctx.view->cursors[cindex];
@@ -65,10 +65,15 @@ void nv_draw_cursor()
             continue;
         }
 
+        size_t length = 0;
+        for (int i = 0; i < cvector_size(l); i++) {
+            length += l[i].size;
+        }
+
         effective_row =
             ctx.window->leaf.area.x +                                   // window position
             ctx.view->gutter_width_cols + ctx.view->gutter_gap +        // space taken by line numbers
-            (c.col > l->length ? l->length : c.col);                        // cap the cursor to the end of the line
+            (c.col > length ? length : c.col);        // cap the cursor to the end of the line
 
         nv_tui_invert_cell(effective_row, c.line - ctx.view->top_line_index);
     }
@@ -129,34 +134,60 @@ int nv_draw_text_buffer(struct nv_view* view, const struct nv_window_area* area)
         return NV_ERR_NOT_INIT;
     }
 
-    cvector_clear(view->buffer->lines); // FIXME, can reuse some lines depending on scroll shift
-    nv_buffer_flatten_tree(view->buffer->tree, view, area);
-    size_t computed_lines = cvector_size(view->buffer->lines);
+    // WARN: cache runs every time view->top_line_index doesn't match cache->first_line_number which is WASTEFUL and not ideal
+
+    nv_buffer_line_cache(view->buffer, view->top_line_index, area->h);
+    struct nv_line_cache* cache = &view->buffer->cache;
+    
+    if (cache->size == 0) {
+        return NV_OK;
+    }
+
     size_t line_no = view->top_line_index;
-#define VIEW_DRAWABLE_WIDTH (area->w - (view->gutter_gap + view->gutter_width_cols))
-#define RELATIVE_LINE_INDEX (line_no - view->top_line_index)
+    const size_t view_drawable_width = (area->w - (view->gutter_gap + view->gutter_width_cols));
+
     for (size_t row = 0; row < area->h;) {
-        if (RELATIVE_LINE_INDEX > computed_lines) {
+        if (line_no >= cache->first_line_number + cache->size) {
             break;
         }
 
-        struct nv_render_line line = view->buffer->lines[RELATIVE_LINE_INDEX];
+        size_t offset = line_no - cache->first_line_number;
+        size_t line_index_in_cache = (cache->first_line_index + offset) % NV_BUFFER_LINE_CACHE_CAPACITY;
+        cvector(nv_render_line) lines = cache->buffer[line_index_in_cache];
+        if (!lines) {
+            break;
+        }
 
-        if (line.length > 0) {
-            for (int i = 0; i < line.length; i += VIEW_DRAWABLE_WIDTH) {
-                if (view->top_line_index + row > view->buffer->line_count) {
-                    break;
+        int nlines = cvector_size(lines);
+        if (nlines == 0) {
+            /* empty slot: render as empty line and advance */
+            nv_buffer_printf(view, area, row, line_no, NULL, 0);
+            row++;
+            line_no++;
+            continue;
+        }
+
+        for (int i = 0; i < nlines; ++i) {
+            nv_render_line* line = &lines[i];
+            if (line->size > 0) {
+                for (size_t j = 0; j < line->size; j += (size_t)view_drawable_width) {
+                    if (view->top_line_index + row > view->buffer->line_count) break;
+                    size_t remaining = line->size - j;
+                    size_t segsz = (size_t)nv_clamp((int)remaining, 0, (int)view_drawable_width);
+                    nv_buffer_printf(view, area, row, line_no, line->ptr + j, (int)segsz);
+                    row++;
+                    if (row >= area->h) {
+                        break;
+                    }
                 }
-                nv_buffer_printf(view, area, row, line_no, line.text + i, VIEW_DRAWABLE_WIDTH);
+            }
+            else {
+                nv_buffer_printf(view, area, row, line_no, line->ptr, 0);
                 row++;
             }
+            line_no++;
+            if (row >= area->h) break;
         }
-        else {
-            nv_buffer_printf(view, area, row, line_no, line.text, 0);
-            row++;
-        }
-
-        line_no++;
     }
 
     return NV_OK;
@@ -261,14 +292,15 @@ int nv_calculate_statline()
 {
     struct nv_context statline = nv_get_context(nv_editor->statline);
     struct nv_context focus = nv_get_context(nv_get_focused_window());
+    struct cursor c = focus.view->cursors[NV_PRIMARY_CURSOR];
 
     if (!statline.buffer || !focus.buffer) {
         return NV_ERR_NOT_INIT;
     }
 
-    if (snprintf(statline.buffer->buffer, NV_BUFF_CHUNK_SIZE, "%s (%s, %s) --%s--"/* "%d %d,%d/%ld" */, focus.buffer->path,
+    if (snprintf(statline.buffer->buffer, NV_BUFF_CHUNK_SIZE, "%s (%s, %s) --%s-- %zub loaded" " top %zu, ln %zu, cache top %zu", focus.buffer->path,
                 nv_str_buff_type[focus.buffer->type], nv_str_buff_fmt[focus.buffer->format],
-                nv_mode_str[nv_editor->mode] /*, c.y, c.line, c.x, l ? l->data.length : 0 */) == -1) {
+                nv_mode_str[nv_editor->mode], focus.buffer->bytes_loaded, focus.view->top_line_index, c.line, focus.buffer->cache.first_line_number) == -1) {
         return NV_ERR_MEM;
     }
 

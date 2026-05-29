@@ -4,6 +4,7 @@
 #include "cvector.h"
 #include "nvtree.h"
 #include "window.h"
+#include "editor.h"
 
 void nv_cursor_insert_ch(struct nv_context* ctx, struct cursor* cursor, char ch)
 {
@@ -11,15 +12,16 @@ void nv_cursor_insert_ch(struct nv_context* ctx, struct cursor* cursor, char ch)
     // cvector reallocation might have changed pointer
     nv_buffers[ctx->buffer->buff_id + NV_BUFF_ID_ADD] = ctx->buffer->add_buffer;
 
-    ctx->buffer->tree = nv_tree_insert(ctx->buffer->tree, 1, (struct nv_node) {
-        .buff_id = ctx->buffer->buff_id + NV_BUFF_ID_ADD,
-        .buff_index = cvector_size(ctx->buffer->add_buffer) - 1,
-        .length = 1,
-        .lfcount = 0
-    });
+    nv_log_unimplemented();
+    // ctx->buffer->tree = nv_tree_insert(ctx->buffer->tree, 1, (struct nv_node) {
+    //     .buff_id = ctx->buffer->buff_id + NV_BUFF_ID_ADD,
+    //     .buff_index = cvector_size(ctx->buffer->add_buffer) - 1,
+    //     .length = 1,
+    //     .lfcount = 0
+    // });
 
-    ctx->buffer->tree = nv_tree_paint(ctx->buffer->tree, B);
-    cursor->col++;
+    // ctx->buffer->tree = nv_tree_paint(ctx->buffer->tree, B);
+    // cursor->col++;
 }
 
 void nv_cursor_move_down(struct nv_context* ctx, struct cursor* cursor, int amt)
@@ -64,20 +66,25 @@ void nv_cursor_move_up(struct nv_context* ctx, struct cursor* cursor, int amt)
 
 void nv_cursor_move_x(struct nv_context* ctx, struct cursor* cursor, int amt)
 {
-    struct nv_render_line* l = nv_get_computed_line(ctx, cursor->line);
+    cvector(nv_render_line) l = nv_get_computed_line(ctx, cursor->line);
 
     if (!l) {
         return;
     }
 
+    size_t length = 0;
+    for (int i = 0; i < cvector_size(l); i++) {
+        length += l[i].size;
+    }
+
     // cursor could be out of range before any change to the cursor
-    if (cursor->col > l->length)
-        cursor->col = l->length;
+    if (cursor->col > length)
+        cursor->col = length;
 
     cursor->col += amt;
 
-    if (cursor->col > l->length)
-        cursor->col = l->length;
+    if (cursor->col > length)
+        cursor->col = length;
 
     if (cursor->col < 0)
         cursor->col = 0;

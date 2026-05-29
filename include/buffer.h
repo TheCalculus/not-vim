@@ -33,14 +33,31 @@ typedef enum {
     NV_FILE_FORMAT_END,
 } nv_buff_fmt;
 
+typedef enum {
+    NV_BUFF_ID_ORIGINAL       = 0,
+    NV_BUFF_ID_ADD,
+    NV_BUFF_ID_DEL,
+    NV_BUFF_ID_END,
+} nv_buff_id;
+
 extern char* nv_str_buff_type[NV_BUFF_TYPE_END];
 extern char* nv_str_buff_fmt[NV_FILE_FORMAT_END];
+#define NV_MAX_BUFFERS 256
+extern char* nv_buffers[NV_MAX_BUFFERS]; // nv_buffers[buff_id + nv_buff_id]
 
-typedef nv_pool_index nv_tree_pool_index;
+typedef struct nv_render_line_s {
+    char* ptr;
+    size_t size;
+} nv_render_line;
 
-struct nv_render_line {
-    char* text;
-    size_t length;
+// TODO: make this dynamic, vary on viewport height
+// circular buffer
+#define NV_BUFFER_LINE_CACHE_CAPACITY 128
+struct nv_line_cache {
+    size_t first_line_number;
+    size_t first_line_index;
+    size_t size;
+    cvector(nv_render_line) buffer[NV_BUFFER_LINE_CACHE_CAPACITY]; // easier to integrate lines spread across nodes
 };
 
 struct nv_buff {
@@ -53,9 +70,8 @@ struct nv_buff {
     size_t append_cursor;
     nv_buff_type type;
     nv_buff_fmt format;
-    nv_tree_pool_index tree;
-    cvector(struct nv_render_line) lines;
-    cvector(char) renders;
+    nv_tree* tree;
+    struct nv_line_cache cache;
     cvector(char) scratch;
     cvector(char) buffer;
     cvector(char) add_buffer;
@@ -65,11 +81,11 @@ struct nv_view* nv_view_init(const char* buffer_file_path);
 struct nv_buff* nv_buffer_init(const char* path);
 int nv_buffer_build_tree(struct nv_buff* buff);
 int nv_buffer_open_file(struct nv_buff* buff, const char* path);
-int nv_rebuild_lines(struct nv_buff* buff, int* out_line_count);
 int nv_free_view(struct nv_view* view);
 int nv_free_buffer(struct nv_buff* buff);
-struct nv_render_line* nv_get_computed_line(struct nv_context* ctx, int lineno);
-nv_pool_index line(struct nv_context* ctx, int lineno);
-void nv_buffer_flatten_tree(nv_pool_index tree, struct nv_view* view, const struct nv_window_area* area);
+void nv_buffer_line_cache(struct nv_buff* buff, size_t first_line, size_t amt);
+cvector(nv_render_line) nv_get_computed_line(struct nv_context* ctx, int lineno);
+int nv_clamp(int x, int min, int max);
+
 
 #endif
