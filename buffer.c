@@ -9,6 +9,7 @@
 #include "editor.h"
 #include "error.h"
 #include "nvtree/nvtree.h"
+#include "std.h"
 #include "view.h"
 
 // extern'd
@@ -73,19 +74,6 @@ int nv_buffer_open_file(struct nv_buff* buff, const char* path)
     }
 
     return NV_OK;
-}
-
-int nv_clamp(int x, int min, int max)
-{
-    if (x > max) {
-        return max;
-    }
-
-    if (x < min) {
-        return min; 
-    }
-
-    return x;
 }
 
 // returns no. lines not put into cache

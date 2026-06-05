@@ -7,6 +7,7 @@
 #include "error.h"
 #include "view.h"
 #include "window.h"
+#include "std.h"
 #include <tui.h>
 
 static int count_no_digits(int n);
