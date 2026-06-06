@@ -135,11 +135,18 @@ int nv_draw_text_buffer(struct nv_view* view, const struct nv_window_area* area)
         return NV_ERR_NOT_INIT;
     }
 
-    // WARN: cache runs every time view->top_line_index doesn't match cache->first_line_number which is WASTEFUL and not ideal
-
-    nv_buffer_line_cache(view->buffer, view->top_line_index, area->h);
     struct nv_line_cache* cache = &view->buffer->cache;
-    
+    size_t viewport_end = view->top_line_index + area->h;
+    size_t cache_end = cache->first_line_number + cache->size;
+
+    if (cache_end <= viewport_end + NV_BUFF_LINE_CACHE_EXPAND_LINES) {
+        nv_buffer_line_cache(
+            view->buffer,
+            view->top_line_index,
+            area->h
+        );
+    }
+
     if (cache->size == 0) {
         return NV_OK;
     }

@@ -143,37 +143,40 @@ static size_t nv_buffer_put_lines_into_cache(struct nv_buff* buff, nv_tree* node
     return amt - lines_put_in;
 }
 
-#define NV_BUFF_LINE_CACHE_EXPAND_LINES 10
 void nv_buffer_line_cache(struct nv_buff* buff, size_t first_line_number, size_t amt)
 {
-    // FIXME: cache explosively... only cache if we can cache like 150 lines at once...
-
     if (!buff) {
         nv_editor->status = NV_ERR_NOT_INIT;
         return;
     }
 
     struct nv_line_cache* cache = &buff->cache;
-    
-    if (first_line_number == cache->first_line_number && cache->size >= amt) {
+
+    size_t cache_end_line = cache->first_line_number + cache->size;
+    if (first_line_number >= cache->first_line_number && first_line_number + amt <= cache_end_line) {
         // nocache
         return;
     }
 
-    size_t cache_top = (size_t)nv_clamp((int)first_line_number - NV_BUFF_LINE_CACHE_EXPAND_LINES, 1, (int)buff->line_count);
-    
+    size_t cache_top = (size_t)nv_clamp(
+        (int)first_line_number - NV_BUFF_LINE_CACHE_EXPAND_LINES,
+        1,
+        (int)buff->line_count
+    );
+
     nv_tree* stack[NV_TREE_MAX_STACK_DEPTH];
     int top = 0;
     size_t lines_into_node = 0;
     nv_tree* first_line = nv_tree_find_by_line(buff->tree, cache_top, stack, &top, &lines_into_node);
 
-    if (first_line_number > cache->first_line_number + cache->size || cache->size == 0) {
+    if (cache->size == 0 || first_line_number >= cache->first_line_number + cache->size) {
         nv_log("full recache\n");
         cache->first_line_number = cache_top;
         cache->first_line_index = 0;
         cache->size = 0;
 
-        size_t lines_unsuccess = nv_buffer_put_lines_into_cache(buff, first_line, lines_into_node, NV_BUFFER_LINE_CACHE_CAPACITY);
+        size_t skip = lines_into_node ? lines_into_node - 1 : 0;
+        size_t lines_unsuccess = nv_buffer_put_lines_into_cache(buff, first_line, skip, NV_BUFFER_LINE_CACHE_CAPACITY);
         cache->size = NV_BUFFER_LINE_CACHE_CAPACITY - lines_unsuccess;
     }
     else if (first_line_number < cache->first_line_number) {
@@ -187,12 +190,13 @@ void nv_buffer_line_cache(struct nv_buff* buff, size_t first_line_number, size_t
             (cache->first_line_index + NV_BUFFER_LINE_CACHE_CAPACITY - wrapped_delta) % NV_BUFFER_LINE_CACHE_CAPACITY;
         cache->first_line_index = cache_insertion_index;
 
+        size_t skip = lines_into_node ? lines_into_node - 1 : 0;
         if (delta <= cache_free_space) {
             cache->size += delta;
-            (void)nv_buffer_put_lines_into_cache(buff, first_line, lines_into_node, delta);
+            (void)nv_buffer_put_lines_into_cache(buff, first_line, skip, delta);
         }
         else {
-            (void)nv_buffer_put_lines_into_cache(buff, first_line, lines_into_node, delta);
+            (void)nv_buffer_put_lines_into_cache(buff, first_line, skip, delta);
             cache->size += delta;
             if (cache->size > NV_BUFFER_LINE_CACHE_CAPACITY) {
                 cache->size = NV_BUFFER_LINE_CACHE_CAPACITY;
@@ -220,7 +224,7 @@ void nv_buffer_line_cache(struct nv_buff* buff, size_t first_line_number, size_t
             return;
         }
 
-        size_t lines_to_append = desired_end - cache_end_line;
+        size_t lines_to_append = nv_max(desired_end - cache_end_line, NV_BUFF_LINE_CACHE_EXPAND_LINES);
         size_t free_space = NV_BUFFER_LINE_CACHE_CAPACITY - cache->size;
         if (lines_to_append > free_space) {
             lines_to_append = free_space;
@@ -238,8 +242,8 @@ void nv_buffer_line_cache(struct nv_buff* buff, size_t first_line_number, size_t
         cache->first_line_index =
             (cache->first_line_index + cache->size) % NV_BUFFER_LINE_CACHE_CAPACITY;
 
-        size_t not_inserted = nv_buffer_put_lines_into_cache(
-            buff, append_node, lines_into_node, lines_to_append);
+        size_t skip = lines_into_node ? lines_into_node - 1 : 0;
+        size_t not_inserted = nv_buffer_put_lines_into_cache(buff, append_node, skip, lines_to_append);
 
         cache->first_line_index = saved_index;
         cache->size += lines_to_append - not_inserted;
@@ -400,7 +404,7 @@ struct nv_buff* nv_buffer_init(const char* path)
 cvector(nv_render_line) nv_get_computed_line(struct nv_context* ctx, int lineno)
 {
     struct nv_line_cache* cache = &ctx->buffer->cache;
-    if (cache->first_line_number + cache->size < lineno) {
+    if (cache->size == 0 || lineno >= cache->first_line_number + cache->size) {
         return NULL;
     }
 

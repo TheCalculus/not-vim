@@ -15,6 +15,9 @@
 #define NV_BUFF_CHUNK_SIZE     1024 * 16
 #define NV_LINE_CAP            2048
 
+#define NV_BUFFER_LINE_CACHE_CAPACITY   128
+#define NV_BUFF_LINE_CACHE_EXPAND_LINES 60
+
 typedef enum {
     NV_BUFF_TYPE_STDIN        = 0,
     NV_BUFF_TYPE_STDOUT       = 1,
@@ -52,7 +55,6 @@ typedef struct nv_render_line_s {
 
 // TODO: make this dynamic, vary on viewport height
 // circular buffer
-#define NV_BUFFER_LINE_CACHE_CAPACITY 128
 struct nv_line_cache {
     size_t first_line_number;
     size_t first_line_index;
@@ -85,7 +87,6 @@ int nv_free_view(struct nv_view* view);
 int nv_free_buffer(struct nv_buff* buff);
 void nv_buffer_line_cache(struct nv_buff* buff, size_t first_line, size_t amt);
 cvector(nv_render_line) nv_get_computed_line(struct nv_context* ctx, int lineno);
-int nv_clamp(int x, int min, int max);
 
 
 #endif
