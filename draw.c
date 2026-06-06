@@ -155,7 +155,8 @@ int nv_draw_text_buffer(struct nv_view* view, const struct nv_window_area* area)
     const size_t view_drawable_width = (area->w - (view->gutter_gap + view->gutter_width_cols));
 
     for (size_t row = 0; row < area->h;) {
-        if (line_no >= cache->first_line_number + cache->size) {
+        // WARN: looks like cache->size will not set to true cache size sometimes, so sanity check
+        if (line_no >= cache->first_line_number + cache->size || line_no > view->buffer->line_count) {
             break;
         }
 
