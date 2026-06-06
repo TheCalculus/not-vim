@@ -52,7 +52,11 @@ void nv_handle_key_input(unsigned char ansi)
         return;
     }
 
-    struct cursor* cursor = &focus.view->cursors[NV_PRIMARY_CURSOR];
+    struct cursor* cursor = nv_primary_cursor(&focus);
+
+    if (!cursor) {
+        return;
+    }
 
     if (nv_editor->mode == NV_MODE_INSERT) {
         if (isprint(ansi)) {

@@ -301,7 +301,7 @@ int nv_calculate_statline()
 {
     struct nv_context statline = nv_get_context(nv_editor->statline);
     struct nv_context focus = nv_get_context(nv_get_focused_window());
-    struct cursor c = focus.view->cursors[NV_PRIMARY_CURSOR];
+    struct cursor* c = nv_primary_cursor(&focus);
 
     if (!statline.buffer || !focus.buffer) {
         return NV_ERR_NOT_INIT;
@@ -309,7 +309,7 @@ int nv_calculate_statline()
 
     if (snprintf(statline.buffer->buffer, NV_BUFF_CHUNK_SIZE, "%s (%s, %s) --%s-- %zub loaded" " top %zu, ln %zu, cache top %zu", focus.buffer->path,
                 nv_str_buff_type[focus.buffer->type], nv_str_buff_fmt[focus.buffer->format],
-                nv_mode_str[nv_editor->mode], focus.buffer->bytes_loaded, focus.view->top_line_index, c.line, focus.buffer->cache.first_line_number) == -1) {
+                nv_mode_str[nv_editor->mode], focus.buffer->bytes_loaded, focus.view->top_line_index, c ? c->line : 0, focus.buffer->cache.first_line_number) == -1) {
         return NV_ERR_MEM;
     }
 
