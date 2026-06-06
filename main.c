@@ -85,7 +85,7 @@ static void nv_cleanup()
     }
     nv_arena_free_all();
     if (rv != NV_OK) {
-        fprintf(stderr, "%s (%d)\n", nv_strerror(rv), rv);
+        fprintf(stderr, "%s (%d) issued by %s@%s\n", nv_strerror(rv), rv, nv_editor->setter_func, nv_editor->setter_line);
     }
 }
 
