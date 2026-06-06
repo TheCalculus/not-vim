@@ -76,7 +76,11 @@ struct nv_editor {
     nv_mode mode;
     double width;                      // NOTE: guaranteed to be integer
     double height;                     // NOTE: guaranteed to be integer
-    int status;
+    struct {
+        int status;
+        char* setter_line;
+        char* setter_func;
+    };
     bool running;
     char inputs[NV_INPUT_BACKLOG_CAP];
     struct timespec start;
@@ -89,6 +93,16 @@ struct nv_editor {
     cvector(struct nv_window_node*) windows;
     cvector(struct nv_view*) views;
 };
+
+#define STR2(x) #x
+#define STR(x) STR2(x)
+
+#define NV_EDITOR_SET_STATUS(statno)               \
+    do {                                           \
+        nv_editor->status = (statno);              \
+        nv_editor->setter_line = STR(__LINE__);    \
+        nv_editor->setter_func = __FUNCTION__;     \
+    } while (0)
 
 // defaults
 

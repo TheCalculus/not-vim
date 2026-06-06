@@ -32,7 +32,7 @@ void nv_event_free()
 void nv_event_register_sub(enum nv_event_sub event, struct nv_event_callback callback)
 {
     if (callback.type != NV_EVENT_TYPE_LUA_REF) {
-        nv_editor->status = NV_WARN_UNIMPLEMENTED;
+        NV_EDITOR_SET_STATUS(NV_WARN_UNIMPLEMENTED);
         return;
     }
 

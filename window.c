@@ -13,7 +13,7 @@ struct nv_window_node* nv_window_node_init(enum nv_window_kind kind)
     struct nv_window_node* window = (struct nv_window_node*)malloc(sizeof(struct nv_window_node));
 
     if (!window) {
-        nv_editor->status = NV_ERR_MEM;
+        NV_EDITOR_SET_STATUS(NV_ERR_MEM);
         return NULL;
     }
 
@@ -23,7 +23,7 @@ struct nv_window_node* nv_window_node_init(enum nv_window_kind kind)
     window->leaf.view = NULL;
 
     cvector_push_back(nv_editor->windows, window);
-    nv_editor->status = NV_OK;
+    NV_EDITOR_SET_STATUS(NV_OK);
     return window;
 }
 
@@ -46,7 +46,7 @@ nv_err nv_window_set_focus(struct nv_window_node* focus)
 struct nv_window_node* nv_window_node_push_child(struct nv_window_node* root, struct nv_window_node* child)
 {
     if (!child || !root) {
-        nv_editor->status = NV_ERR_NOT_INIT;
+        NV_EDITOR_SET_STATUS(NV_ERR_NOT_INIT);
         return NULL;
     }
 
@@ -76,7 +76,7 @@ struct nv_window_node* nv_window_node_push_child(struct nv_window_node* root, st
 void nv_free_windows()
 {
     if (!nv_editor->windows) {
-        nv_editor->status = NV_ERR_NOT_INIT;
+        NV_EDITOR_SET_STATUS(NV_ERR_NOT_INIT);
         return;
     }
 
@@ -93,7 +93,7 @@ void nv_free_windows()
 void nv_free_views()
 {
     if (!nv_editor->views) {
-        nv_editor->status = NV_ERR_NOT_INIT;
+        NV_EDITOR_SET_STATUS(NV_ERR_NOT_INIT);
         return;
     }
 

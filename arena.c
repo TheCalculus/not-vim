@@ -33,7 +33,7 @@ static void* nv_init_root_head(void* ptr, size_t size)
     addr += sizeof(struct nv_arena_alloc_head) + curr->size;
 
     if (addr + sizeof(struct nv_arena_alloc_head) + size > base + NV_ARENA_DEFAULT_ALLOC_SIZE) {
-        nv_editor->status = NV_ERR_MEM;
+        NV_EDITOR_SET_STATUS(NV_ERR_MEM);
         return NULL;
     }
 
@@ -102,7 +102,7 @@ void* nv_arena_realloc(void* ptr, size_t size)
     void* new = nv_arena_malloc(size);
 
     if (!new) {
-        nv_editor->status = NV_ERR_MEM;
+        NV_EDITOR_SET_STATUS(NV_ERR_MEM);
         return NULL;
     }
 

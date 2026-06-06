@@ -281,7 +281,7 @@ static void nv_register_pollers(uv_loop_t* loop, struct nv_poller_fd fds[], size
         poller = &nv_editor->pollers[fds[i].poller_index];
         *poller = (uv_poll_t*)malloc(sizeof(uv_poll_t));
         if (!*poller) {
-            nv_editor->status = NV_ERR_MEM;
+            NV_EDITOR_SET_STATUS(NV_ERR_MEM);
             break;
         }
 
@@ -322,14 +322,14 @@ void nv_main()
 
     uv_loop_t* loop = (uv_loop_t*)malloc(sizeof(uv_loop_t));
     if (!loop) {
-        nv_editor->status = NV_ERR_MEM;
+        NV_EDITOR_SET_STATUS(NV_ERR_MEM);
         exit(nv_editor->status);
     }
     uv_loop_init(loop);
 
     nv_editor->tty = (uv_tty_t*)malloc(sizeof(uv_tty_t));
     if (uv_tty_init(loop, nv_editor->tty, STDIN_FILENO, UV_READABLE) != 0) {
-        nv_editor->status = NV_ERR;
+        NV_EDITOR_SET_STATUS(NV_ERR);
         exit(nv_editor->status);
     }
     (void)uv_tty_set_mode(nv_editor->tty, UV_TTY_MODE_RAW);

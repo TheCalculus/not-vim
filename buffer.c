@@ -80,7 +80,7 @@ int nv_buffer_open_file(struct nv_buff* buff, const char* path)
 static size_t nv_buffer_put_lines_into_cache(struct nv_buff* buff, nv_tree* node, size_t skip, size_t amt)
 {
     if (!buff || !node) {
-        nv_editor->status = NV_ERR_NOT_INIT;
+        NV_EDITOR_SET_STATUS(NV_ERR_NOT_INIT);
         return 0;
     }
 
@@ -146,7 +146,7 @@ static size_t nv_buffer_put_lines_into_cache(struct nv_buff* buff, nv_tree* node
 void nv_buffer_line_cache(struct nv_buff* buff, size_t first_line_number, size_t amt)
 {
     if (!buff) {
-        nv_editor->status = NV_ERR_NOT_INIT;
+        NV_EDITOR_SET_STATUS(NV_ERR_NOT_INIT);
         return;
     }
 
@@ -257,7 +257,7 @@ struct nv_view* nv_view_init(const char* buffer_file_path)
     struct nv_view* view = (struct nv_view*)calloc(1, sizeof(struct nv_view));
 
     if (!view) {
-        nv_editor->status = NV_ERR_MEM;
+        NV_EDITOR_SET_STATUS(NV_ERR_MEM);
         return NULL;
     }
 
@@ -275,7 +275,7 @@ struct nv_view* nv_view_init(const char* buffer_file_path)
     }
 
     cvector_push_back(nv_editor->views, view);
-    nv_editor->status = NV_OK;
+    NV_EDITOR_SET_STATUS(NV_OK);
     return view;
 }
 
@@ -285,7 +285,7 @@ struct nv_view* nv_view_init(const char* buffer_file_path)
 static size_t nv_calculate_tree_node_granularity(struct nv_buff* buff)
 {
     if (!buff) {
-        nv_editor->status = NV_ERR_NOT_INIT;
+        NV_EDITOR_SET_STATUS(NV_ERR_NOT_INIT);
         return 0;
     }
 
@@ -370,7 +370,7 @@ struct nv_buff* nv_buffer_init(const char* path)
     struct nv_buff* buffer = (struct nv_buff*)calloc(1, sizeof(struct nv_buff));
 
     if (!buffer) {
-        nv_editor->status = NV_ERR_NOT_INIT;
+        NV_EDITOR_SET_STATUS(NV_ERR_NOT_INIT);
         return NULL;
     }
 
@@ -394,7 +394,7 @@ struct nv_buff* nv_buffer_init(const char* path)
 
     if (path) {
         buffer->path = (char*)path;
-        nv_editor->status = nv_buffer_open_file(buffer, path);
+        NV_EDITOR_SET_STATUS(nv_buffer_open_file(buffer, path));
         (void)nv_buffer_build_tree(buffer);
     }
 
