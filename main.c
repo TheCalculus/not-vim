@@ -31,18 +31,18 @@ static int nv_open_file_in_window(struct nv_editor* editor, const char* filename
 {
     nv_log("opening argument filepath %s\n", filename);
 
+    struct nv_view* view = nv_view_init(filename);
+    if (!view) {
+        return NV_ERR_MEM;
+    }
+
     struct nv_window_node* window = nv_window_node_init(NV_WM_VIEW);
-
     if (!window) {
+        nv_free_view(view);
         return NV_ERR_MEM;
     }
 
-    window->leaf.view = nv_view_init(filename);
-
-    if (nv_editor->status != NV_OK) {
-        return NV_ERR_MEM;
-    }
-
+    window->leaf.view = view;
     nv_window_set_focus(nv_window_node_push_child(editor->focus, window));
 
     return editor->status;
@@ -51,12 +51,12 @@ static int nv_open_file_in_window(struct nv_editor* editor, const char* filename
 static void nv_editor_cleanup(struct nv_editor* editor)
 {
     nv_tui_free();
-    nv_free_windows();
     nv_free_views();
+    nv_free_windows();
+    editor->logger = NULL;
     nv_event_free();
     editor->focus = NULL;
     editor->window = NULL;
-    editor->logger = NULL;
 
     for (int i = 0; i < NV_POLLER_COUNT; i++) {
         if (!editor->pollers[i]) {
@@ -80,13 +80,13 @@ static void nv_cleanup()
 {
     nv_tui_clear();
     int rv = nv_editor->status;
+    if (rv != NV_OK) {
+        fprintf(stderr, "%s (%d) issued by %s@%s\n", nv_strerror(rv), rv, nv_editor->setter_func, nv_editor->setter_line);
+    }
     if (nv_editor) {
         nv_editor_cleanup(nv_editor);
     }
     nv_arena_free_all();
-    if (rv != NV_OK) {
-        fprintf(stderr, "%s (%d) issued by %s@%s\n", nv_strerror(rv), rv, nv_editor->setter_func, nv_editor->setter_line);
-    }
 }
 
 static void nv_fatal_signal(int sig, siginfo_t* info, void* ucontext)
@@ -296,7 +296,9 @@ static int nvrpc_load(struct nv_api* nv_api)
         #endif
     ;
 
-    strcpy(&buf[nread], libnvrpc_path);
+    if (snprintf(buf + nread, bufsiz - nread, "%s", libnvrpc_path) >= bufsiz - nread) {
+        return NV_ERR;
+    }
     void* nvrpc_handle = dlopen(buf, RTLD_NOW);
 
     if (!nvrpc_handle) {
@@ -354,7 +356,9 @@ static int nvlua_load(struct nv_api* nv_api)
         #endif
     ;
 
-    strcpy(&buf[nread], libnvlua_path);
+    if (snprintf(buf + nread, bufsiz - nread, "%s", libnvlua_path) >= bufsiz - nread) {
+        return NV_ERR;
+    }
     void* nvlua_handle = dlopen(buf, RTLD_NOW);
 
     if (!nvlua_handle) {

@@ -24,6 +24,7 @@ static struct {
     struct termios termios0;
 } nv_tui_state;
 
+static cvector(char) nv_tui_outbuf = NULL;
 static volatile sig_atomic_t nv_tui_resize_pending = 0;
 
 static int nv_tui_query_dimensions(size_t* width, size_t* height);
@@ -73,6 +74,7 @@ static int nv_tui_resize(size_t width, size_t height)
 
     struct nv_tui_cell* new_new = (struct nv_tui_cell*)realloc(nv_tui_state.new, bytes);
     if (!new_new && count) {
+        free(curr_new);
         return NV_ERR;
     }
 
@@ -121,8 +123,10 @@ void nv_tui_present()
         (void)nv_tui_process_resize();
     }
 
-    cvector(char) buf = NULL;
-    cvector_reserve(buf, 1024);
+    if (!nv_tui_outbuf) {
+        cvector_reserve(nv_tui_outbuf, 1024);
+    }
+    cvector_set_size(nv_tui_outbuf, 0);
 
     size_t width = nv_tui_state.width;
     size_t height = nv_tui_state.height;
@@ -152,8 +156,8 @@ void nv_tui_present()
                 col++;
             }
 
-            size_t off = cvector_size(buf);
-            cvector_reserve(buf, off + 64 + (col - run_start));
+            size_t off = cvector_size(nv_tui_outbuf);
+            cvector_reserve(nv_tui_outbuf, off + 64 + (col - run_start));
             struct nv_hl hl = nv_tui_state.nv_hls[new_row[run_start].hl];
 
             if (new_row[run_start].flags & NV_TUI_FLAGS_INVERT) {
@@ -165,33 +169,39 @@ void nv_tui_present()
 #define NV_LINEAR_HEX_TO_RGB(c) (((c) >> 16) & 0xff), (((c) >> 8) & 0xff), ((c) & 0xff)
 
             int size = snprintf(
-                buf + off,
-                cvector_capacity(buf) - off,
+                nv_tui_outbuf + off,
+                cvector_capacity(nv_tui_outbuf) - off,
                 "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm\x1b[%zu;%zuH",
                 NV_LINEAR_HEX_TO_RGB(hl.fg),
                 NV_LINEAR_HEX_TO_RGB(hl.bg),
                 row + 1,
                 run_start + 1
             );
-
-            cvector_set_size(buf, off + size);
-
-            for (size_t k = run_start; k < col; k++) {
-                char ch = new_row[k].rune ? (char)new_row[k].rune : ' ';
-                buf[cvector_size(buf)] = ch;
-                cvector_set_size(buf, cvector_size(buf) + 1);
-                curr_row[k] = new_row[k];
+            if (size < 0) {
+                size = 0;
             }
+
+            cvector_set_size(nv_tui_outbuf, off + (size_t)size);
+
+            size_t run_len = col - run_start;
+            size_t chars_off = cvector_size(nv_tui_outbuf);
+            cvector_reserve(nv_tui_outbuf, chars_off + run_len);
+
+            for (size_t k = 0; k < run_len; k++) {
+                size_t idx = run_start + k;
+                nv_tui_outbuf[chars_off + k] = new_row[idx].rune ? (char)new_row[idx].rune : ' ';
+                curr_row[idx] = new_row[idx];
+            }
+
+            cvector_set_size(nv_tui_outbuf, chars_off + run_len);
         }
     }
 
     nv_tui_newbuf_clear();
 
-    if (cvector_size(buf)) {
-        (void)write(STDOUT_FILENO, buf, cvector_size(buf));
+    if (cvector_size(nv_tui_outbuf)) {
+        (void)write(STDOUT_FILENO, nv_tui_outbuf, cvector_size(nv_tui_outbuf));
     }
-
-    cvector_free(buf);
 }
 
 void nv_tui_invert_cell(int x, int y)
@@ -258,7 +268,7 @@ static void nv_tui_hl_init()
     nv_tui_state.colours[NV_TUI_COLOUR_BLACK] = NV_BLACK;
     nv_tui_state.colours[NV_TUI_COLOUR_WHITE] = NV_WHITE;
     nv_tui_state.colours[NV_TUI_COLOUR_GRAY] = NV_GRAY;
-    
+
     NV_TUI_NEW_HL(
         NV_TUI_HL_BACKGROUND,
         NV_TUI_COLOUR_FOREGROUND,
@@ -337,11 +347,13 @@ void nv_tui_free()
     free(nv_tui_state.curr);
     free(nv_tui_state.new);
     cvector_free(nv_tui_state.nv_hls);
+    cvector_free(nv_tui_outbuf);
 
     nv_tui_state.curr = NULL;
     nv_tui_state.new = NULL;
     nv_tui_state.width = 0;
     nv_tui_state.height = 0;
+    nv_tui_outbuf = NULL;
 }
 
 static void nv_tui_newbuf_clear()

@@ -61,7 +61,13 @@ int nv_buffer_open_file(struct nv_buff* buff, const char* path)
         }
 
         buff->bytes_loaded = fread(buff->buffer, sizeof(char), buff->chunk_size, buff->file);
-        cvector_set_size(buff->buffer, buff->chunk_size);
+        if (buff->bytes_loaded < buff->chunk_size) {
+            cvector_set_size(buff->buffer, buff->bytes_loaded + 1);
+            buff->buffer[buff->bytes_loaded] = '\0';
+        }
+        else {
+            cvector_set_size(buff->buffer, buff->chunk_size);
+        }
 
         break;
 
@@ -271,6 +277,8 @@ struct nv_view* nv_view_init(const char* buffer_file_path)
     cvector_set_size(view->cursors, 1);
 
     if (nv_editor->status != NV_OK) {
+        nv_free_buffer(view->buffer);
+        free(view);
         return NULL;
     }
 
@@ -395,10 +403,19 @@ struct nv_buff* nv_buffer_init(const char* path)
     if (path) {
         buffer->path = (char*)path;
         NV_EDITOR_SET_STATUS(nv_buffer_open_file(buffer, path));
-        (void)nv_buffer_build_tree(buffer);
+        if (nv_editor->status == NV_OK) {
+            if (nv_buffer_build_tree(buffer) != NV_OK) {
+                NV_EDITOR_SET_STATUS(NV_ERR);
+            }
+        }
     }
 
-    return nv_editor->status == NV_OK ? buffer : NULL;
+    if (nv_editor->status != NV_OK) {
+        nv_free_buffer(buffer);
+        return NULL;
+    }
+
+    return buffer;
 }
 
 cvector(nv_render_line) nv_get_computed_line(struct nv_context* ctx, int lineno)

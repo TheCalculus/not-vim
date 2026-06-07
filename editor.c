@@ -114,6 +114,10 @@ int nv_editor_init(struct nv_editor* editor)
 
 void nv_log(const char* fmt, ...)
 {
+    if (!nv_editor || !nv_editor->logger) {
+        return;
+    }
+
     struct nv_context logger = nv_get_context(nv_editor->logger);
     if (!logger.buffer || !logger.buffer->buffer) {
         return;
@@ -243,12 +247,14 @@ static void nv_on_nng_send(uv_poll_t* handle, int status, int events)
     }
 }
 
+static char nv_tty_read_buffer[4096];
+
 static void nv_on_tty_stream(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 {
     if (nread < 0 || nread == UV_EOF) {
         uv_read_stop(stream);
+        uv_close((uv_handle_t*)stream, nv_on_tty_closed);
         nv_editor->tty = NULL;
-        uv_close((uv_handle_t*)nv_editor->tty, nv_on_tty_closed);
         return;
     }
 
@@ -265,8 +271,9 @@ static void nv_on_tty_stream(uv_stream_t* stream, ssize_t nread, const uv_buf_t*
 
 static void nv_tty_stream_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
-    buf->base = (char*)malloc(suggested_size);
-    buf->len = suggested_size;
+    (void)handle;
+    buf->base = nv_tty_read_buffer;
+    buf->len = suggested_size <= sizeof(nv_tty_read_buffer) ? suggested_size : sizeof(nv_tty_read_buffer);
 }
 
 static void nv_register_pollers(uv_loop_t* loop, struct nv_poller_fd fds[], size_t nfds)
@@ -286,11 +293,15 @@ static void nv_register_pollers(uv_loop_t* loop, struct nv_poller_fd fds[], size
         }
 
         if ((rv = uv_poll_init(loop, *poller, fds[i].fd)) != 0) {
+            free(*poller);
+            *poller = NULL;
             nv_tui_free();
             printf("failed to register poller: %s\n", uv_strerror(rv));
             exit(NV_ERR);
         }
         if ((rv = uv_poll_start(*poller, UV_READABLE, fds[i].cb)) != 0) {
+            free(*poller);
+            *poller = NULL;
             nv_tui_free();
             printf("failed to start poller: %s\n", uv_strerror(rv));
             exit(NV_ERR);
@@ -328,12 +339,27 @@ void nv_main()
     uv_loop_init(loop);
 
     nv_editor->tty = (uv_tty_t*)malloc(sizeof(uv_tty_t));
+    if (!nv_editor->tty) {
+        NV_EDITOR_SET_STATUS(NV_ERR_MEM);
+        free(loop);
+        exit(nv_editor->status);
+    }
+
     if (uv_tty_init(loop, nv_editor->tty, STDIN_FILENO, UV_READABLE) != 0) {
         NV_EDITOR_SET_STATUS(NV_ERR);
+        free(nv_editor->tty);
+        nv_editor->tty = NULL;
+        free(loop);
         exit(nv_editor->status);
     }
     (void)uv_tty_set_mode(nv_editor->tty, UV_TTY_MODE_RAW);
-    (void)uv_read_start((uv_stream_t*)nv_editor->tty, nv_tty_stream_alloc, nv_on_tty_stream);
+    if (uv_read_start((uv_stream_t*)nv_editor->tty, nv_tty_stream_alloc, nv_on_tty_stream) != 0) {
+        NV_EDITOR_SET_STATUS(NV_ERR);
+        uv_close((uv_handle_t*)nv_editor->tty, nv_on_tty_closed);
+        nv_editor->tty = NULL;
+        free(loop);
+        exit(nv_editor->status);
+    }
 
     // register nng pollers if rpc api is on
     if (nv_editor->nvrpc) {

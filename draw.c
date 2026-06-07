@@ -307,9 +307,11 @@ int nv_calculate_statline()
         return NV_ERR_NOT_INIT;
     }
 
-    if (snprintf(statline.buffer->buffer, NV_BUFF_CHUNK_SIZE, "%s (%s, %s) --%s-- %zub loaded" " top %zu, ln %zu, cache top %zu", focus.buffer->path,
+    const char* path = focus.buffer->path ? focus.buffer->path : "[no path]";
+
+    if (snprintf(statline.buffer->buffer, NV_BUFF_CHUNK_SIZE, "%s (%s, %s) --%s-- %zub loaded" " top %zu, ln %zu, cache top %zu", path,
                 nv_str_buff_type[focus.buffer->type], nv_str_buff_fmt[focus.buffer->format],
-                nv_mode_str[nv_editor->mode], focus.buffer->bytes_loaded, focus.view->top_line_index, c ? c->line : 0, focus.buffer->cache.first_line_number) == -1) {
+                nv_mode_str[nv_editor->mode], focus.buffer->bytes_loaded, focus.view ? focus.view->top_line_index : 0, c ? c->line : 0, focus.buffer->cache.first_line_number) == -1) {
         return NV_ERR_MEM;
     }
 
